@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>化工脱硫设备数字孪生监控中心</title>
+  <link rel="stylesheet" href="./assets/css/theme.css" />
+  <link rel="stylesheet" href="./assets/css/screen.css" />
+
+  <!-- Three.js 模块映射（npmmirror 国内镜像，无需本地安装）-->
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://registry.npmmirror.com/three/0.160.0/files/build/three.module.js",
+    "three/addons/": "https://registry.npmmirror.com/three/0.160.0/files/examples/jsm/"
+  }
+}
+</script>
+
+  <!-- ECharts：bootcdn 主用，加载失败自动切 npmmirror -->
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.1/echarts.min.js"></script>
+  <script>
+    if (!window.echarts) {
+      document.write('<script src="https://registry.npmmirror.com/echarts/5.5.1/files/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- 启动看门狗 + 可视化报错：脚本/CDN/协议异常时，把原因直接显示在屏幕上 -->
+  <script>
+    function showBootError(text) {
+      var tip = document.getElementById('cloud-tip');
+      if (tip) { tip.style.color = '#ff6b6b'; tip.textContent = String(text).slice(0, 160); }
+      var box = document.getElementById('boot-error');
+      if (box) { box.style.display = 'block'; box.textContent = String(text).slice(0, 320); }
+    }
+    // 捕获资源加载错误（CDN/模块）与运行时异常
+    window.addEventListener('error', function (e) {
+      var t = e.target;
+      if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) {
+        showBootError('资源加载失败（CDN 不可达？）：' + (t.src || t.href));
+      } else if (e.message) {
+        showBootError('脚本错误：' + e.message);
+      }
+    }, true);
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e.reason; showBootError('运行异常：' + (r && r.message ? r.message : r));
+    });
+    // 看门狗：6 秒后主程序仍未启动 → 给出明确指引
+    window.addEventListener('load', function () {
+      setTimeout(function () {
+        if (!window.__TWIN_BOOTED__) {
+          showBootError('主程序未启动。请检查：① 必须通过 http://localhost 访问，不能直接双击打开本文件；② 需能访问 CDN(npmmirror/bootcdn)；可按 F12 查看 Console 红色报错。');
+        }
+      }, 6000);
+    });
+  </script>
+</head>
+
+<body>
+
+  <!-- ===== 登录门控（进入大屏前）===== -->
+  <div id="screen-login">
+    <form class="sl-card" id="screen-login-form">
+      <div class="sl-logo">智 硫 孪 生 · DESULF DIGITAL TWIN</div>
+      <div class="sl-title">数字孪生监控中心</div>
+      <div class="sl-sub">化工脱硫设备数字孪生可视化监控管理系统 V1.0</div>
+      <label>账号</label>
+      <input id="sl-user" value="admin" placeholder="请输入账号" autocomplete="username" />
+      <label>密码</label>
+      <input id="sl-pass" type="password" value="admin123" placeholder="请输入密码" autocomplete="current-password" />
+      <div class="sl-err" id="sl-err"></div>
+      <button class="sl-btn" type="submit">进 入 系 统</button>
+    </form>
+  </div>
+
+  <!-- ===== 拨开云彩 加载层 ===== -->
+  <div id="cloud-loader">
+    <div id="cloud-seam"></div>
+    <div class="cloud-half" id="cloud-left"><canvas></canvas></div>
+    <div class="cloud-half" id="cloud-right"><canvas></canvas></div>
+    <div class="cloud-center">
+      <div class="cl-logo">智 硫 孪 生 · DESULF DIGITAL TWIN</div>
+      <div class="cl-title">化工脱硫设备数字孪生监控中心</div>
+      <div class="cl-bar">
+        <div id="cloud-bar-fill"></div>
+      </div>
+      <div class="cl-meta">
+        <span id="cloud-tip">正在连接孪生数据中台…</span>
+        <span id="cloud-percent">0%</span>
+      </div>
+      <div id="boot-error"
+        style="display:none;margin-top:16px;padding:12px 14px;font-size:12px;line-height:1.7;color:#ffb4b4;background:rgba(255,91,91,.10);border:1px solid rgba(255,91,91,.4);border-radius:8px;text-align:left;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 三维舞台 ===== -->
+  <div id="stage"></div>
+  <div id="hotspot-layer"></div>
+
+  <!-- ===== UI 覆盖层 ===== -->
+  <div class="screen-ui">
+
+    <!-- 顶部标题栏 -->
+    <header class="topbar">
+      <div class="tb-left">
+        <div class="env">
+          <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 18a4 4 0 010-8 5 5 0 019.6-1.5A3.5 3.5 0 0117 18z" />
+          </svg>
+          <span>多云</span><span class="num">23.5℃</span>
+        </div>
+        <nav class="tb-nav">
+          <a href="./index.html">监控大屏</a>
+          <a href="./admin/index.html">管理后台</a>
+          <a href="#" id="logout-link">退出</a>
+        </nav>
+      </div>
+      <div class="title-wrap">
+        <h1 id="sys-title">化工脱硫设备数字孪生监控中心</h1>
+        <div id="sys-brand">智硫孪生 V1.0</div>
+      </div>
+      <div class="tb-right">
+        <div id="clock-time" class="num">00:00:00</div>
+        <div id="clock-date">2026.06.05</div>
+      </div>
+    </header>
+
+    <!-- 左列 -->
+    <aside class="side left">
+      <section class="tech-panel p-eff">
+        <div class="panel-title">脱硫效率实时趋势</div>
+        <div class="panel-body">
+          <div id="chart-eff" class="chart"></div>
+        </div>
+      </section>
+      <section class="tech-panel p-so2">
+        <div class="panel-title">进 / 出口 SO₂ 浓度对比</div>
+        <div class="panel-body">
+          <div id="chart-so2" class="chart"></div>
+        </div>
+      </section>
+      <section class="tech-panel p-units">
+        <div class="panel-title">工艺单元总览</div>
+        <div class="panel-body">
+          <div id="unit-list"></div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- 中部：KPI -->
+    <div class="center">
+      <div id="kpi-bar"></div>
+    </div>
+
+    <!-- 右列 -->
+    <aside class="side right">
+      <section class="tech-panel p-gauge">
+        <div class="panel-title">达标排放率</div>
+        <div class="panel-body">
+          <div id="chart-gauge" class="chart"></div>
+        </div>
+      </section>
+      <section class="tech-panel p-energy">
+        <div class="panel-title">工艺能耗占比</div>
+        <div class="panel-body">
+          <div id="chart-energy" class="chart"></div>
+        </div>
+      </section>
+      <section class="tech-panel p-status">
+        <div class="panel-title">关键设备运行负荷</div>
+        <div class="panel-body">
+          <div id="chart-status" class="chart"></div>
+        </div>
+      </section>
+      <section class="tech-panel p-alarm">
+        <div class="panel-title">实时告警 / 事件</div>
+        <div class="panel-body">
+          <div id="alarm-list"></div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- 底部工具栏 -->
+    <div class="toolbar">
+      <div class="tool" id="tb-reset"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 11a8 8 0 102.3-6.3M4 5v6h6" />
+        </svg>视角复位</div>
+      <div class="tool" id="tb-cruise"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 11-2.6-6.4M21 4v4h-4" />
+          <circle cx="12" cy="12" r="2.5" />
+        </svg>自动巡航</div>
+      <div class="tool" id="tb-section"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="1" />
+          <path d="M4 13h16" stroke-dasharray="2 2" />
+        </svg>剖切透视</div>
+      <div class="tool" id="tb-wire"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 3v18M4 7.5l8 4.5 8-4.5" />
+        </svg>线框模式</div>
+      <div class="tool" id="tb-full"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        </svg>全屏</div>
+      <div id="section-slider"><span>剖切高度</span><input type="range" min="0" max="100" value="50" /></div>
+    </div>
+
+  </div>
+
+  <!-- 悬浮单元数据面板 -->
+  <div id="float-panel">
+    <div class="fp-head">
+      <span class="dot"></span>
+      <span class="fp-title">脱硫吸收塔</span>
+      <span class="fp-code">WFGD-T01</span>
+      <span class="fp-close">✕</span>
+    </div>
+    <div class="fp-body"></div>
+  </div>
+
+  <div class="copyright"></div>
+
+  <script type="module" src="./assets/js/main.js"></script>
+</body>
+
+</html>

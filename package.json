@@ -1,0 +1,11 @@
+{
+  "name": "desulf-digital-twin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "化工脱硫设备数字孪生可视化监控管理系统 V1.0（Flask 后端 + 三维大屏 + 物联后台）",
+  "scripts": {
+    "setup": "pip install -r server/requirements.txt",
+    "dev": "python server/run.py",
+    "start": "python server/run.py"
+  }
+}

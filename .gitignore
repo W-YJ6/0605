@@ -1,0 +1,28 @@
+# Python 虚拟环境
+.venv/
+venv/
+env/
+
+# Python 缓存与编译产物
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 生成的数据库（用 server/seed.py 重建）
+server/twin.db
+*.sqlite
+*.sqlite3
+
+# 大文件 / 媒体素材（按用户要求排除）
+*.mp4
+*.exr
+
+# 系统与编辑器文件
+desktop.ini
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 日志
+*.log
