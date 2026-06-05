@@ -26,6 +26,29 @@ window.__UNITS__ = UNITS;
 /* —— 登录门控：登录通过后才进入大屏（与后台共享 sessionStorage 会话）—— */
 const AUTH_KEY = 'twin_auth';
 
+/* —— 演示模式判定 ——
+ * 静态部署（如 GitHub Pages）没有 Flask 后端，自动进入演示模式：跳过登录、改用前端本地模拟数据。
+ * 本地开发（localhost / 127.0.0.1）默认走真实后端；可用 ?demo=1 强制演示、?live=1 强制走后端。
+ */
+const _q = new URLSearchParams(location.search);
+const _isLocal = ['localhost', '127.0.0.1', ''].includes(location.hostname);
+const DEMO = _q.has('demo') ? true : (_q.has('live') ? false : !_isLocal);
+
+function showDemoBadge() {
+  const b = document.createElement('div');
+  b.textContent = '演示模式 · 模拟数据';
+  b.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:9999;' +
+    'padding:4px 14px;font-size:12px;letter-spacing:1px;color:#ffd9a6;white-space:nowrap;' +
+    'background:rgba(255,148,22,.14);border:1px solid rgba(255,148,22,.5);border-radius:14px;' +
+    'pointer-events:none;backdrop-filter:blur(4px);';
+  document.body.appendChild(b);
+  // 演示模式隐藏依赖后端的入口（管理后台 / 退出登录）
+  document.querySelectorAll('.tb-nav a').forEach((a) => {
+    const href = a.getAttribute('href') || '';
+    if (href.includes('admin') || a.id === 'logout-link') a.style.display = 'none';
+  });
+}
+
 function gate() {
   const login = document.getElementById('screen-login');
   // 退出登录
@@ -34,6 +57,14 @@ function gate() {
     API.clear();
     location.reload();
   });
+
+  // 演示模式：无后端，跳过登录直接进入大屏（数据/告警走前端本地兜底）
+  if (DEMO) {
+    API.demo = true;
+    showDemoBadge();
+    boot();
+    return;
+  }
 
   // 仅凭后端有效令牌判定已登录（保证两端切换都携带有效令牌）
   if (API.token) { boot(); return; }

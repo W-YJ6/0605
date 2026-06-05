@@ -5,6 +5,7 @@
 
 export const API = {
   base: '',
+  demo: false,                 // 演示模式：true 时不访问后端，所有请求直接抛错以触发前端本地兜底
   token: sessionStorage.getItem('twin_token') || '',
 
   setToken(t) { this.token = t; sessionStorage.setItem('twin_token', t); },
@@ -15,6 +16,7 @@ export const API = {
   },
 
   async _fetch(path, opts = {}) {
+    if (this.demo) throw new Error('demo-offline');   // 演示模式：跳过后端，由调用方回退本地模拟
     const headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
     if (this.token) headers['Authorization'] = 'Bearer ' + this.token;
     const res = await fetch(this.base + path, Object.assign({}, opts, { headers }));
